@@ -25,6 +25,7 @@ toolbar = DebugToolbarExtension(app)
 connect_db(app)
 
 
+
 ##############################################################################
 # User signup/login/logout
 
@@ -51,6 +52,12 @@ def do_logout():
 
     if CURR_USER_KEY in session:
         del session[CURR_USER_KEY]
+
+@app.errorhandler(404)
+def page_not_found(e):
+    """404 page."""
+
+    return render_template('404.html'), 404
 
 
 @app.route('/signup', methods=["GET", "POST"])
