@@ -27,7 +27,7 @@ pycparser==2.19
 Pygments==2.2.0
 python-dateutil==2.7.3
 simplegeneric==0.8.1
-six==1.11.0
+six==1.16.0
 SQLAlchemy==1.2.12
 text-unidecode==1.2
 traitlets==4.3.2
