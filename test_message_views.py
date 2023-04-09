@@ -48,8 +48,16 @@ class MessageViewTestCase(TestCase):
                                     email="test@test.com",
                                     password="testuser",
                                     image_url=None)
+        self.testuser_id = 111111
+        self.testuser.id = self.testuser_id
+
+        # self.testmessage = Message(text="test", user_id=self.testuser_id)
+        # self.testmessage_id = 1111
+        # self.testmessage.id = self.testmessage_id
 
         db.session.commit()
+
+
 
     def test_add_message(self):
         """Can use add a message?"""
@@ -71,3 +79,112 @@ class MessageViewTestCase(TestCase):
 
             msg = Message.query.one()
             self.assertEqual(msg.text, "Hello")
+
+    def test_add_message_invalid_user(self):
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = 4569876789679824
+
+            resp = c.post("/messages/new", data={"text": "test"}, follow_redirects=True)
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn("Access unauthorized", str(resp.data))
+
+    def test_add_message_no_session(self):
+
+        with self.client as c:
+            resp = c.post("/messages/new", data={"text": "test"}, follow_redirects=True)
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn("Access unauthorized", str(resp.data))
+ 
+    def test_show_message(self):
+
+        message = Message(
+            id=1111,
+            text="test",
+            user_id=self.testuser_id
+        )
+        
+        db.session.add(message)
+        db.session.commit()
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+            
+            message = Message.query.get(1111)
+
+            resp = c.get(f'/messages/1111')
+
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn(message.text, str(resp.data))
+            
+    def test_invalid_message(self):
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+            
+            resp = c.get('/messages/xxxxxxxxxxx')
+
+            self.assertEqual(resp.status_code, 404)
+
+    def test_message_delete_unauthorized(self):
+
+        wronguser = User.signup("wronguser", "wrong@email.com", "wrongpw", None)
+
+        wronguser.id = 12345
+
+        message = Message(
+            id=1111,
+            text="test",
+            user_id=self.testuser_id
+        )
+
+        db.session.add_all([wronguser,message])
+        db.session.commit()
+
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = 12345
+
+            resp = c.post("/messages/1111/delete", follow_redirects=True)
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn("Access unauthorized", str(resp.data))
+
+    def test_message_delete_unauthenticated(self):
+
+        message = Message(
+            id=1111,
+            text="test",
+            user_id=self.testuser_id
+        )
+        db.session.add(message)
+        db.session.commit()
+
+        with self.client as c: 
+            resp = c.post("/messages/1111/delete", follow_redirects=True)
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn("Access unauthorized", str(resp.data))
+
+            m = Message.query.get(1111)
+            self.assertIsNotNone(m)
+    
+    def test_message_delete_correct_user(self):
+        message = Message(
+            id=1111,
+            text="test",
+            user_id=self.testuser_id
+        )
+        db.session.add(message)
+        db.session.commit()
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            resp = c.post("/messages/1111/delete", follow_redirects=True)
+            self.assertEqual(resp.status_code, 200)
+
+            msg = Message.query.get(1111)
+            self.assertIsNone(msg)
