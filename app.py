@@ -4,7 +4,7 @@ from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
-from forms import UserAddForm, LoginForm, MessageForm
+from forms import UserAddForm, LoginForm, MessageForm, UserEditForm
 from models import db, connect_db, User, Message
 
 CURR_USER_KEY = "curr_user"
@@ -214,7 +214,28 @@ def profile():
     """Update profile for current user."""
 
     # IMPLEMENT THIS
+    form = UserEditForm()
+    username = User.query.get(session[CURR_USER_KEY])
+    
+    if form.validate_on_submit():
+        user = User.authenticate(username.username,
+                                 form.password.data)
+        if user: 
+            user.username = form.username.data
+            user.email = form.email.data
+            user.image_url = form.image_url.data
+            user.header_image_url = form.header_image_url.data
+            user.bio = form.bio.data
 
+            db.session.add(user)
+            db.session.commit()
+
+            return redirect(f"/users/{user.id}")
+        else:
+            flash("Invalid username/password.")
+            return redirect("/")
+
+    return render_template("/users/edit.html", form=form)
 
 @app.route('/users/delete', methods=["POST"])
 def delete_user():
@@ -293,9 +314,13 @@ def homepage():
     - logged in: 100 most recent messages of followed_users
     """
 
+    id_list = [follower.id for follower in g.user.following]
+    id_list.append(g.user.id)
+
     if g.user:
         messages = (Message
                     .query
+                    .filter(Message.user_id.in_(id_list))
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
