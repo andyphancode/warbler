@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, render_template, request, flash, redirect, session, g
+from flask import Flask, render_template, request, flash, redirect, session, g, abort
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
@@ -53,11 +53,6 @@ def do_logout():
     if CURR_USER_KEY in session:
         del session[CURR_USER_KEY]
 
-@app.errorhandler(404)
-def page_not_found(e):
-    """404 page."""
-
-    return render_template('404.html'), 404
 
 
 @app.route('/signup', methods=["GET", "POST"])
@@ -259,6 +254,44 @@ def delete_user():
 
     return redirect("/signup")
 
+@app.route('/users/add_like/<int:message_id>', methods=["POST"])
+def add_like(message_id):
+    """Like a message."""
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+    
+    user_likes = g.user.likes
+
+    liked_message = Message.query.get_or_404(message_id)
+    
+    # if liked messaged is user's own message
+    if liked_message.user_id == g.user.id:
+        return abort(403)
+
+    if liked_message in user_likes:
+        g.user.likes = [like for like in user_likes if like != liked_message]
+    else:
+        g.user.likes.append(liked_message)
+    
+    db.session.commit()
+
+    return redirect("/")
+
+
+@app.route('/users/<int:user_id>/likes', methods=["GET"])
+def show_likes(user_id):
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")    
+    
+    user = User.query.get_or_404(user_id)
+    return render_template('users/likes.html', user=user, likes=user.likes)
+
+
+
 
 ##############################################################################
 # Messages routes:
@@ -283,7 +316,7 @@ def messages_add():
 
         return redirect(f"/users/{g.user.id}")
 
-    return render_template('messages/new.html', form=form)
+    return render_template('/messages/new.html', form=form)
 
 
 @app.route('/messages/<int:message_id>', methods=["GET"])
@@ -291,7 +324,7 @@ def messages_show(message_id):
     """Show a message."""
 
     msg = Message.query.get(message_id)
-    return render_template('messages/show.html', message=msg)
+    return render_template('/messages/show.html', message=msg)
 
 
 @app.route('/messages/<int:message_id>/delete', methods=["POST"])
@@ -321,13 +354,13 @@ def homepage():
     - logged in: 100 most recent messages of followed_users
     """
 
-    id_list = [follower.id for follower in g.user.following]
-    id_list.append(g.user.id)
+    # id_list = [follower.id for follower in g.user.following]
+    # id_list.append(g.user.id)
 
     if g.user:
         messages = (Message
                     .query
-                    .filter(Message.user_id.in_(id_list))
+                    # .filter(Message.user_id.in_(id_list))
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
@@ -337,6 +370,11 @@ def homepage():
     else:
         return render_template('home-anon.html')
 
+@app.errorhandler(404)
+def page_not_found(e):
+    """404 page."""
+
+    return render_template('404.html'), 404
 
 ##############################################################################
 # Turn off all caching in Flask
