@@ -27,8 +27,8 @@ from app import app
 
 db.create_all()
 
-class UserModelTestCase(TestCase):
-    """Test views for messages."""
+class MessageModelTestCase(TestCase):
+    """Test message model."""
 
     def setUp(self):
 

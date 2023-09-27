@@ -24,8 +24,8 @@ from app import app, CURR_USER_KEY
 
 db.create_all()
 
-class MessageViewTestCase(TestCase):
-    """Test views for messages."""
+class UserViewTestCase(TestCase):
+    """Test views for users."""
 
     def setUp(self):
 
